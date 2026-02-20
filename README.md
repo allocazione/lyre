@@ -13,7 +13,10 @@ A user-first, self-hostable "now listening" bot for Misskey (and Mastodon-compat
 - [Usage](#usage)
 - [Debug Flags](#debug-flags)
 - [Docker](#docker)
+- [Makefile](#makefile)
+- [Credential Encryption](#credential-encryption)
 - [Project Structure](#project-structure)
+- [Credits](#credits)
 - [License](#license)
 
 ---
@@ -26,7 +29,8 @@ A user-first, self-hostable "now listening" bot for Misskey (and Mastodon-compat
 - **Graceful Shutdown**: On receiving SIGINT (Ctrl+C) or SIGTERM (Linux/macOS), the bot sets your bio to offline before exiting.
 - **First-Run Setup**: If no `.env` file is found, the bot launches an interactive wizard (`first_exec`) that guides you through entering all required settings and writes the `.env` file for you.
 - **Debug Tooling**: Built-in flags for testing API connections and music provider output without running the full bot loop.
-- **Docker Support**: Includes a Dockerfile and docker-compose.yml for containerized deployment. A `--docker` CLI flag builds the image directly.
+- **Docker Support**: Includes a Dockerfile and docker-compose.yml for containerized deployment. A `--docker` CLI flag builds the image directly. Automatic detection of already-running instances.
+- **Credential Encryption**: Sensitive values (API tokens, secrets) are encrypted at rest using Fernet symmetric encryption. The first-run wizard encrypts automatically; existing configs can be encrypted with `--encrypt-config`.
 - **Real-time Logging**: Uses `loguru` for structured, colorized, real-time log output to stderr.
 - **Cross-platform**: Runs on both Linux and Windows wherever Python 3.11+ is available.
 
@@ -200,23 +204,82 @@ This connects to your Misskey instance, verifies your access token, prints your 
 python -m lyre --docker
 ```
 
-This builds a Docker image tagged `lyre:latest` using the included Dockerfile. After building, you can run the container with:
-
-```bash
-docker run --env-file .env lyre:latest
-```
+This builds a Docker image tagged `lyre:latest` using the included Dockerfile.
 
 ### Using docker-compose
 
 ```bash
+# Start the bot as a background service
 docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the bot
+docker-compose down
 ```
 
-This builds the image and starts the bot as a background service. The container will restart automatically unless stopped manually.
+The container is named `lyre-bot`, restarts automatically unless stopped manually, and mounts your local config directory.
+
+### Passing environment variables
+
+You can pass your config directly via `--env-file` instead of mounting a directory:
+
+```bash
+docker run --env-file ~/.config/lyre/config.env lyre:latest
+```
+
+### Instance detection
+
+When starting, Lyre checks if a container named `lyre-bot` is already running. If found, it exits with an error to prevent duplicate instances. You can also check manually:
+
+```bash
+python -m lyre --status
+# or
+make docker-status
+```
 
 ### Dockerfile details
 
-The Dockerfile uses `python:3.11-slim` as the base image, installs dependencies via Poetry, and sets `python -m lyre` as the entrypoint. The resulting image is minimal and production-ready.
+The Dockerfile uses `python:3.11-slim` as the base image, installs dependencies via pip, and sets `python -m lyre` as the entrypoint. The resulting image is minimal and production-ready.
+
+---
+
+## Makefile
+
+A `Makefile` is included for common tasks. Run `make help` to see all available targets:
+
+| Target                | Description                                            |
+| --------------------- | ------------------------------------------------------ |
+| `make install`        | Create a virtual environment and install dependencies  |
+| `make update`         | Pull latest code, reinstall deps, rebuild Docker image |
+| `make run`            | Run the bot                                            |
+| `make run-verbose`    | Run the bot with debug logging                         |
+| `make docker-build`   | Build the Docker image                                 |
+| `make docker-up`      | Start via docker-compose (background)                  |
+| `make docker-down`    | Stop the docker-compose service                        |
+| `make docker-status`  | Check if a Lyre container is running                   |
+| `make docker-logs`    | Tail logs from the running container                   |
+| `make lint`           | Run linter (ruff)                                      |
+| `make test`           | Run tests with pytest                                  |
+| `make encrypt-config` | Encrypt sensitive fields in the config file            |
+| `make clean`          | Remove caches, build artefacts, and venv               |
+
+---
+
+## Credential Encryption
+
+Sensitive configuration values (`MISSKEY_TOKEN`, `LASTFM_API_KEY`, `LASTFM_API_SECRET`) are encrypted at rest using [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption.
+
+- **Automatic**: The first-run setup wizard encrypts values before writing to disk.
+- **Manual**: Encrypt an existing plaintext config with:
+  ```bash
+  python -m lyre --encrypt-config
+  # or
+  make encrypt-config
+  ```
+- Encrypted values are stored with the `ENC:` prefix and decrypted transparently at startup.
+- The encryption key is stored at `CONFIG_DIR/.lyre.key` and should **not** be shared.
 
 ---
 
@@ -229,10 +292,12 @@ lyre/
   bot.py                Main bot logic, CLI definition, polling loop
   config.py             Configuration loader, first_exec() setup wizard,
                         platform-specific config path resolution
+  crypto.py             Credential encryption (Fernet)
   logger.py             Logging setup (loguru)
   clients/
     __init__.py
     misskey.py           Misskey API client (bio updates, note posting)
+    songlink.py          Song.link / Odesli cross-platform link lookup
     music/
       __init__.py
       base.py            Abstract base class and Track dataclass
@@ -240,10 +305,17 @@ lyre/
       statsfm.py         Stats.fm provider (beta API, httpx)
 .env.example             Example environment configuration
 requirements.txt         pip dependency list
+Makefile                 Common development and deployment tasks
 Dockerfile               Container build instructions
 docker-compose.yml       Container orchestration
 pyproject.toml           Project metadata and dependencies
 ```
+
+---
+
+## Credits
+
+Developed by **Selene** ([@sel@social.fedicate.org](https://social.fedicate.org/@sel)).
 
 ---
 
@@ -254,5 +326,5 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 ---
 
 <p align="center">
-  made with ❤️ from italy
+  Made with ❤️ from Italy, for all the Fediverse users ❤️
 </p>

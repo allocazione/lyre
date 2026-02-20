@@ -31,6 +31,15 @@ _INTRO_NOTE = (
     "⭐ me @ https://github.com/allocazione/lyre"
 )
 
+_VERSION = "0.1.0"
+
+_BANNER = f"""
+🎻  Lyre v{_VERSION}
+    A self-hostable 'now listening' bot for Misskey/Mastodon
+    ⭐ https://github.com/allocazione/lyre
+    Developed by Selene (@sel@social.fedicate.org)
+"""
+
 
 def _get_music_provider():
     """Instantiate the configured music provider."""
@@ -160,6 +169,7 @@ async def _run_bot():
     provider = _get_music_provider()
     songlink = SongLinkClient()
     last_track: Optional[Track] = None
+    last_posted_track_str: Optional[str] = None
     running = True
 
     def handle_shutdown(sig, frame):
@@ -219,14 +229,15 @@ async def _run_bot():
                                 track_str + bio_extra
                             )
 
-                        # Post note with platform links
-                        if Config.POST_NOTES:
+                        # Post note with platform links (skip if same song)
+                        if Config.POST_NOTES and track_str != last_posted_track_str:
                             note_text = f"Now listening: {track_str}"
                             if songlink_url:
                                 note_text += f"\n\n{songlink_url}"
                             elif track.url:
                                 note_text += f"\n{track.url}"
                             await misskey.post_note(note_text)
+                            last_posted_track_str = track_str
 
                         last_track = track
                     else:
@@ -283,6 +294,58 @@ def _docker_build():
         sys.exit(1)
 
 
+def _check_already_running() -> bool:
+    """Check whether a Lyre container is already running in Docker.
+
+    Returns True if a running container named 'lyre-bot' is found.
+    Silently returns False if Docker is not installed.
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--filter", "name=lyre-bot", "--format", "{{.ID}}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        container_id = result.stdout.strip()
+        if container_id:
+            logger.warning(
+                f"Lyre is already running in Docker container: {container_id}"
+            )
+            return True
+        return False
+    except FileNotFoundError:
+        # Docker not installed — that's fine, skip the check
+        logger.debug("Docker not found; skipping instance check.")
+        return False
+    except Exception as e:
+        logger.debug(f"Could not check Docker status: {e}")
+        return False
+
+
+def _show_status():
+    """Print whether a Lyre Docker container is currently running."""
+    logger.info("Checking for running Lyre instances...")
+    if _check_already_running():
+        logger.info("Lyre is currently running in Docker.")
+    else:
+        logger.info("No running Lyre Docker container found.")
+
+
+def _encrypt_existing_config():
+    """Encrypt sensitive fields in an existing config file."""
+    from lyre.config import CONFIG_FILE
+    from lyre.crypto import encrypt_config_file, generate_key
+
+    if not CONFIG_FILE.exists():
+        logger.error(f"No config file found at {CONFIG_FILE}")
+        sys.exit(1)
+
+    generate_key()
+    encrypt_config_file(CONFIG_FILE)
+    logger.info("Done. Sensitive fields have been encrypted.")
+
+
 @app.command()
 def main(
     debug_songs: bool = typer.Option(
@@ -300,6 +363,16 @@ def main(
         "--docker",
         help="Build the Docker image and exit.",
     ),
+    status: bool = typer.Option(
+        False,
+        "--status",
+        help="Check if Lyre is already running in Docker and exit.",
+    ),
+    encrypt_config: bool = typer.Option(
+        False,
+        "--encrypt-config",
+        help="Encrypt sensitive fields in an existing config file and exit.",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -310,13 +383,25 @@ def main(
     """Lyre -- a self-hostable 'now listening' bot for Misskey/Mastodon."""
     setup_logger(debug=verbose)
 
-    # Load config -- skip the interactive wizard for debug/docker flags
+    # Print startup banner / credits
+    for line in _BANNER.strip().splitlines():
+        logger.info(line)
+
+    # Load config -- skip the interactive wizard for utility flags
     # so they work even without a .env file.
     from lyre.config import init_config
-    is_debug = debug_songs or debug_acc or docker
-    init_config(skip_wizard=is_debug)
+    is_utility = debug_songs or debug_acc or docker or status or encrypt_config
+    init_config(skip_wizard=is_utility)
 
     try:
+        if status:
+            _show_status()
+            return
+
+        if encrypt_config:
+            _encrypt_existing_config()
+            return
+
         if docker:
             _docker_build()
             return
@@ -328,6 +413,14 @@ def main(
         if debug_acc:
             asyncio.run(_debug_acc())
             return
+
+        # Check for existing Docker instance before starting
+        if _check_already_running():
+            logger.error(
+                "Another Lyre instance is already running in Docker. "
+                "Stop it first with 'docker stop lyre-bot' or 'make docker-down'."
+            )
+            sys.exit(1)
 
         # Default: run the bot
         asyncio.run(_run_bot())
