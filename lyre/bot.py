@@ -184,6 +184,11 @@ async def _run_bot():
     # Post intro note on first connection
     await _post_intro_if_needed(misskey)
 
+    if Config.FEDI_ACCOUNT:
+        logger.info(f"Fediverse account tag: {Config.FEDI_ACCOUNT}")
+    else:
+        logger.info("No FEDI_ACCOUNT configured — notes will not include a mention.")
+
     logger.info(
         f"Bot started. Polling every {Config.POLL_INTERVAL}s "
         f"using {Config.MUSIC_PROVIDER}."
@@ -219,7 +224,10 @@ async def _run_bot():
 
                         # Post note with platform links (skip if same song)
                         if Config.POST_NOTES and track_str != last_posted_track_str:
-                            note_text = f"Now listening: {track_str}"
+                            if Config.FEDI_ACCOUNT:
+                                note_text = f"{Config.FEDI_ACCOUNT} is now listening: {track_str}"
+                            else:
+                                note_text = f"Now listening: {track_str}"
                             if songlink_url:
                                 note_text += f"\n\n{songlink_url}"
                             elif track.url:

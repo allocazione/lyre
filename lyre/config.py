@@ -13,10 +13,30 @@ debug flags can bypass the interactive wizard.
 """
 
 import os
+import re
 import sys
 import platform
 from pathlib import Path
 from dotenv import load_dotenv
+
+
+def _normalize_fedi_account(value: str) -> str:
+    """Normalize and validate a Fediverse handle.
+
+    Accepts formats like ``@user@instance``, ``user@instance``, or blank.
+    Returns ``@user@instance`` on success, or an empty string if the
+    value is blank or malformed.
+    """
+    value = value.strip()
+    if not value:
+        return ""
+    # Ensure leading '@'
+    if not value.startswith("@"):
+        value = "@" + value
+    # Basic format check: @user@domain (domain must have at least one dot)
+    if re.match(r"^@[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}$", value):
+        return value
+    return ""
 
 
 def _get_config_dir() -> Path:
@@ -120,11 +140,18 @@ def _first_exec_inner():
             if not statsfm_user:
                 print("  This field is required.\n")
 
+    # -- Fediverse Account ----------------------------------------------------
+    print("\n--- Fediverse Account ---\n")
+    print("Optionally link your own Fediverse account so the bot mentions")
+    print("you in every 'now listening' note (e.g. @user@instance.social).\n")
+
+    raw_fedi = input("Your Fediverse handle (leave blank to skip): ").strip()
+    fedi_account = _normalize_fedi_account(raw_fedi)
+    if raw_fedi and not fedi_account:
+        print("  Invalid handle format. Expected @user@instance.tld — skipping.")
+
     # -- Bot Settings ---------------------------------------------------------
     print("\n--- Bot Settings ---\n")
-
-    update_bio_input = input("Update bio with online/offline status? [Y/n]: ").strip().lower()
-    update_bio = "false" if update_bio_input == "n" else "true"
 
     post_notes_input = input("Post notes when track changes? [Y/n]: ").strip().lower()
     post_notes = "false" if post_notes_input == "n" else "true"
@@ -161,8 +188,10 @@ def _first_exec_inner():
         "# -- Stats.fm --",
         f"STATSFM_USERNAME={statsfm_user}",
         "",
+        "# -- Fediverse Account --",
+        f"FEDI_ACCOUNT={fedi_account}",
+        "",
         "# -- Bot Settings --",
-        f"UPDATE_BIO={update_bio}",
         f"POST_NOTES={post_notes}",
         f"POLL_INTERVAL={poll_interval}",
     ]
@@ -226,8 +255,10 @@ class Config:
     # Stats.fm
     STATSFM_USERNAME: str = os.getenv("STATSFM_USERNAME", "")
 
+    # Fediverse Account (optional mention tag in posted notes)
+    FEDI_ACCOUNT: str = _normalize_fedi_account(os.getenv("FEDI_ACCOUNT", ""))
+
     # Feature Flags
-    UPDATE_BIO: bool = os.getenv("UPDATE_BIO", "true").lower() == "true"
     POST_NOTES: bool = os.getenv("POST_NOTES", "true").lower() == "true"
     POLL_INTERVAL: int = int(os.getenv("POLL_INTERVAL", "30"))
 
@@ -257,7 +288,7 @@ class Config:
         cls.LASTFM_API_SECRET = _dec("LASTFM_API_SECRET")
         cls.LASTFM_USERNAME = os.getenv("LASTFM_USERNAME", "")
         cls.STATSFM_USERNAME = os.getenv("STATSFM_USERNAME", "")
-        cls.UPDATE_BIO = os.getenv("UPDATE_BIO", "true").lower() == "true"
+        cls.FEDI_ACCOUNT = _normalize_fedi_account(os.getenv("FEDI_ACCOUNT", ""))
         cls.POST_NOTES = os.getenv("POST_NOTES", "true").lower() == "true"
         cls.POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "30"))
 
@@ -285,4 +316,13 @@ class Config:
             raise ValueError(
                 f"Unknown music provider: '{cls.MUSIC_PROVIDER}'. "
                 "Use 'lastfm' or 'statsfm'."
+            )
+
+        # Soft warning for malformed FEDI_ACCOUNT (non-fatal)
+        raw_fedi = os.getenv("FEDI_ACCOUNT", "")
+        if raw_fedi and not cls.FEDI_ACCOUNT:
+            import warnings
+            warnings.warn(
+                f"FEDI_ACCOUNT value '{raw_fedi}' looks malformed "
+                f"(expected @user@instance.tld). Notes will not include a mention."
             )

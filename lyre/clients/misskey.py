@@ -46,20 +46,6 @@ class MisskeyClient:
         response.raise_for_status()
         return response.json()
 
-    async def update_bio(self, bio: str) -> None:
-        """Update the user's profile description (bio)."""
-        response = await self.client.post(
-            "/api/i/update",
-            json={
-                "i": self.token,
-                "description": bio,
-            },
-        )
-        if response.status_code >= 400:
-            logger.error(f"Misskey API error in update_bio ({response.status_code}): {response.text}")
-        response.raise_for_status()
-        logger.info(f"Bio updated.")
-
     async def post_note(self, text: str, visibility: str = "home") -> dict:
         """Post a note (status update) to Misskey.
 

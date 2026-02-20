@@ -6,13 +6,27 @@ A user-first, self-hostable "now listening" bot for Misskey (and Mastodon-compat
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
+  - [Linux](#linux)
+  - [Windows](#windows)
 - [Configuration](#configuration)
+  - [Interactive Setup (Recommended)](#interactive-setup-recommended)
+  - [Manual Setup](#manual-setup)
+  - [Obtaining API Credentials](#obtaining-api-credentials)
 - [Usage](#usage)
+  - [Run the bot](#run-the-bot)
 - [Debug Flags](#debug-flags)
+  - [Test Music Provider](#test-music-provider)
+  - [Test Account Connection](#test-account-connection)
 - [Docker](#docker)
+  - [Using the CLI flag](#using-the-cli-flag)
+  - [Using docker-compose](#using-docker-compose)
+  - [Passing environment variables](#passing-environment-variables)
+  - [Instance detection](#instance-detection)
+  - [Dockerfile details](#dockerfile-details)
 - [Makefile](#makefile)
 - [Credential Encryption](#credential-encryption)
 - [Project Structure](#project-structure)
@@ -124,7 +138,6 @@ Open the config file in your editor and set the following values:
 | `LASTFM_API_SECRET`    | Your Last.fm API secret                                | If using Last.fm   |
 | `LASTFM_USERNAME`      | Your Last.fm username                                  | If using Last.fm   |
 | `STATSFM_USERNAME`     | Your Stats.fm username                                 | If using Stats.fm  |
-| `UPDATE_BIO`           | Whether to update your profile bio (`true`/`false`)    | No (default: true) |
 | `POST_NOTES`           | Whether to post notes on track change (`true`/`false`) | No (default: true) |
 | `POLL_INTERVAL`        | Polling interval in seconds                            | No (default: 30)   |
 
