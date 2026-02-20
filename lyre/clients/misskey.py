@@ -63,7 +63,11 @@ class MisskeyClient:
 
         # Remove any existing status line and prepend online status
         clean_bio = self._strip_status_line(current_bio)
-        new_bio = f"[Online] Currently running.\n{clean_bio}".strip()
+        clean_bio = self._strip_now_playing_line(clean_bio)
+        if clean_bio:
+            new_bio = f"[Online] Currently running.\n\n{clean_bio}"
+        else:
+            new_bio = "[Online] Currently running."
         await self.update_bio(new_bio)
         logger.info("Status set to Online.")
 
@@ -75,7 +79,10 @@ class MisskeyClient:
         clean_bio = self._strip_status_line(current_bio)
         # Also strip any "now listening" line
         clean_bio = self._strip_now_playing_line(clean_bio)
-        new_bio = f"[Offline]\n{clean_bio}".strip()
+        if clean_bio:
+            new_bio = f"[Offline]\n\n{clean_bio}"
+        else:
+            new_bio = "[Offline]"
         await self.update_bio(new_bio)
         logger.info("Status set to Offline.")
 
@@ -86,9 +93,10 @@ class MisskeyClient:
 
         clean_bio = self._strip_status_line(current_bio)
         clean_bio = self._strip_now_playing_line(clean_bio)
-        new_bio = (
-            f"[Online] Now listening: {track_str}\n{clean_bio}".strip()
-        )
+        if clean_bio:
+            new_bio = f"[Online] Now listening: {track_str}\n\n{clean_bio}"
+        else:
+            new_bio = f"[Online] Now listening: {track_str}"
         await self.update_bio(new_bio)
 
     async def post_note(self, text: str, visibility: str = "home") -> dict:
