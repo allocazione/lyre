@@ -17,6 +17,7 @@ import re
 import sys
 import platform
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 
@@ -326,3 +327,38 @@ class Config:
                 f"FEDI_ACCOUNT value '{raw_fedi}' looks malformed "
                 f"(expected @user@instance.tld). Notes will not include a mention."
             )
+
+    @classmethod
+    def get_mention_tag(cls) -> str:
+        """Return the correct mention tag for note text.
+
+        If FEDI_ACCOUNT's domain matches MISSKEY_INSTANCE_URL (i.e. same
+        instance), returns ``@username`` (local mention) so that Misskey
+        links to ``https://instance/@username`` instead of the malformed
+        ``https://instance/@username@instance``.
+
+        If the domains differ (remote user) the full ``@user@domain`` is
+        returned so Misskey can resolve the remote mention.
+
+        Returns an empty string when FEDI_ACCOUNT is not configured.
+        """
+        if not cls.FEDI_ACCOUNT:
+            return ""
+
+        # Parse @user@domain
+        match = re.match(r"^@([\w.-]+)@([\w.-]+\.[a-zA-Z]{2,})$", cls.FEDI_ACCOUNT)
+        if not match:
+            return cls.FEDI_ACCOUNT  # shouldn't happen after normalization
+
+        username, fedi_domain = match.group(1), match.group(2).lower()
+
+        # Extract domain from the instance URL the bot is connected to
+        instance_domain = urlparse(cls.MISSKEY_INSTANCE_URL).hostname or ""
+        instance_domain = instance_domain.lower()
+
+        if fedi_domain == instance_domain:
+            # Local user — just @username avoids the double-domain link
+            return f"@{username}"
+        else:
+            # Remote user — full handle needed for federation
+            return cls.FEDI_ACCOUNT

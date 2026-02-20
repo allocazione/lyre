@@ -224,8 +224,9 @@ async def _run_bot():
 
                         # Post note with platform links (skip if same song)
                         if Config.POST_NOTES and track_str != last_posted_track_str:
-                            if Config.FEDI_ACCOUNT:
-                                note_text = f"{Config.FEDI_ACCOUNT} is now listening: {track_str}"
+                            mention = Config.get_mention_tag()
+                            if mention:
+                                note_text = f"{mention} is now listening: {track_str}"
                             else:
                                 note_text = f"Now listening: {track_str}"
                             if songlink_url:
