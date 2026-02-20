@@ -61,32 +61,36 @@ class MisskeyClient:
         response.raise_for_status()
         logger.info(f"Bio updated.")
 
-    async def set_online(self) -> None:
-        """Mark the bot as online in the bio."""
+    async def _ensure_clean_bio(self) -> None:
+        """Fetch and cache the user's real bio once, stripping all bot content."""
+        if self._clean_bio is not None:
+            return
         profile = await self.get_profile()
         current_bio = profile.get("description", "") or ""
+        self._clean_bio = self._clean_bot_lines(current_bio)
+        logger.debug(f"Cached clean bio ({len(self._clean_bio)} chars).")
 
-        # Cache the user's real bio (with all bot headers stripped)
-        self._clean_bio = self._clean_bot_header(current_bio)
-
+    def _build_bio(self, header: str) -> str:
+        """Construct the full bio: header + cached clean user bio."""
         if self._clean_bio:
-            new_bio = f"[Online] Currently running.\n\n{self._clean_bio}"
-        else:
-            new_bio = "[Online] Currently running."
+            return f"{header}\n\n{self._clean_bio}"
+        return header
+
+    async def set_online(self, message: str = "Currently running.") -> None:
+        """Mark the bot as online in the bio.
+
+        Args:
+            message: Status text shown after the [Online] tag.
+        """
+        await self._ensure_clean_bio()
+        new_bio = self._build_bio(f"[Online] {message}")
         await self.update_bio(new_bio)
         logger.info("Status set to Online.")
 
     async def set_offline(self) -> None:
         """Mark the bot as offline in the bio."""
-        if self._clean_bio is None:
-            profile = await self.get_profile()
-            current_bio = profile.get("description", "") or ""
-            self._clean_bio = self._clean_bot_header(current_bio)
-
-        if self._clean_bio:
-            new_bio = f"[Offline]\n\n{self._clean_bio}"
-        else:
-            new_bio = "[Offline]"
+        await self._ensure_clean_bio()
+        new_bio = self._build_bio("[Offline]")
         await self.update_bio(new_bio)
         logger.info("Status set to Offline.")
 
@@ -97,19 +101,11 @@ class MisskeyClient:
             track_str: Display string for the track (e.g. "Artist - Title").
             link: Optional URL (song.link, Spotify, etc.) shown below the header.
         """
-        if self._clean_bio is None:
-            profile = await self.get_profile()
-            current_bio = profile.get("description", "") or ""
-            self._clean_bio = self._clean_bot_header(current_bio)
-
+        await self._ensure_clean_bio()
         header = f"[Online] Now listening: {track_str}"
         if link:
             header += f"\n{link}"
-
-        if self._clean_bio:
-            new_bio = f"{header}\n\n{self._clean_bio}"
-        else:
-            new_bio = header
+        new_bio = self._build_bio(header)
         await self.update_bio(new_bio)
 
     async def post_note(self, text: str, visibility: str = "home") -> dict:
@@ -136,65 +132,49 @@ class MisskeyClient:
         return data
 
     @staticmethod
-    def _clean_bot_header(bio: str) -> str:
-        """Remove all bot status and attached song links from the top of the bio.
+    def _clean_bot_lines(bio: str) -> str:
+        """Strip ALL bot-generated lines from anywhere in the bio.
 
-        Uses a loop to gracefully handle multiple accumulated headers or orphaned
-        links left by older versions of the bot.
+        Removes every line that looks like bot output: [Online]/[Offline]
+        markers, "Now listening:" lines, music-platform URLs, and
+        "Platform: URL" listings.  Returns only the user's own content.
         """
         if not bio:
             return ""
 
-        lines = bio.split("\n")
-
-        # Platform prefixes emitted by SongLinkClient.format_links (full listing)
         _PLATFORM_PREFIXES = (
             "Spotify:", "Apple Music:", "YouTube:", "YouTube Music:",
             "Tidal:", "Amazon Music:", "Deezer:", "SoundCloud:", "song.link:",
         )
 
-        # All URL domains the bot could possibly insert
         _BOT_DOMAINS = (
             "song.link", "album.link", "odesli.co",
-            "last.fm", "spotify.com", "stats.fm",
+            "last.fm", "spotify.com", "open.spotify.com", "stats.fm",
             "music.apple.com", "youtube.com", "youtubemusic.com",
             "tidal.com", "amazon.", "deezer.com", "soundcloud.com",
         )
 
-        while lines:
-            first = lines[0].strip()
+        keep: list[str] = []
+        for line in bio.split("\n"):
+            stripped = line.strip()
 
-            # 1. Remove bot status markers ([Online] / [Offline])
-            if first.startswith("[Online]") or first.startswith("[Offline]"):
-                lines.pop(0)
+            if stripped.startswith(("[Online]", "[Offline]")):
                 continue
-
-            # 2. Remove orphaned "Now listening" lines
-            if first.startswith("Now listening:"):
-                lines.pop(0)
+            if stripped.startswith("Now listening:"):
                 continue
-
-            # 3. Remove music platform URLs
-            if first.startswith(("http://", "https://")):
-                url = first.lower()
-                if any(domain in url for domain in _BOT_DOMAINS):
-                    lines.pop(0)
+            if stripped.startswith("Nothing playing"):
+                continue
+            if stripped.startswith("Currently running"):
+                continue
+            if stripped.startswith(_PLATFORM_PREFIXES):
+                continue
+            if stripped.startswith(("http://", "https://")):
+                if any(d in stripped.lower() for d in _BOT_DOMAINS):
                     continue
 
-            # 4. Remove "Platform: URL" lines from full song.link listings
-            if first.startswith(_PLATFORM_PREFIXES):
-                lines.pop(0)
-                continue
+            keep.append(line)
 
-            # 5. Remove blank lines used as spacing
-            if first == "":
-                lines.pop(0)
-                continue
-
-            # If we reach here, it's normal user bio text
-            break
-
-        return "\n".join(lines).strip()
+        return "\n".join(keep).strip()
 
     async def close(self):
         await self.client.aclose()

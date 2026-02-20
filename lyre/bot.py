@@ -201,6 +201,11 @@ async def _run_bot():
                 track = await provider.get_now_playing()
 
                 if track and track.is_now_playing:
+                    # Treat placeholder values as "nothing playing"
+                    if track.artist == "Unknown Artist" or track.title == "Unknown Track":
+                        track = None
+
+                if track and track.is_now_playing:
                     track_str = str(track)
                     last_track_str = str(last_track) if last_track else None
 
@@ -243,7 +248,7 @@ async def _run_bot():
                     # Was playing, now stopped
                     logger.info("Playback stopped.")
                     if Config.UPDATE_BIO:
-                        await misskey.set_online()
+                        await misskey.set_online("Nothing playing.")
                     last_track = None
                 else:
                     logger.debug("No track currently playing.")

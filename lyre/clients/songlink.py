@@ -89,9 +89,14 @@ class SongLinkClient:
         if not links:
             return ""
 
-        # Prefer the universal song.link page for compact mode
-        if compact and "song.link" in links:
-            return links["song.link"]
+        if compact:
+            # Prefer the universal song.link page
+            if "song.link" in links:
+                return links["song.link"]
+            # Fall back to the first available platform URL (e.g. Spotify)
+            for platform, url in links.items():
+                return url
+            return ""
 
         # Full listing (for notes)
         parts = []
