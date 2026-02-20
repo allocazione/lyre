@@ -105,16 +105,17 @@ async def _debug_songs():
         logger.info(f"  Playing: {track.is_now_playing}")
 
         # Test song.link lookup
-        if track.url:
-            logger.info("Looking up cross-platform links...")
-            links = await songlink.get_links(track.url)
-            if links:
-                for platform, url in links.items():
-                    logger.info(f"  {platform}: {url}")
-            else:
-                logger.info("  No cross-platform links found.")
+        logger.info("Looking up cross-platform links...")
+        links = await songlink.get_links(
+            track.url or "",
+            artist=track.artist,
+            title=track.title,
+        )
+        if links:
+            for platform, url in links.items():
+                logger.info(f"  {platform}: {url}")
         else:
-            logger.info("  No track URL available for song.link lookup.")
+            logger.info("  No cross-platform links found.")
     else:
         logger.info("No track is currently playing.")
 
@@ -214,9 +215,12 @@ async def _run_bot():
                         # Look up cross-platform links
                         platform_links = None
                         songlink_url = None
-                        if track.url:
-                            platform_links = await songlink.get_links(track.url)
-                            if platform_links:
+                        platform_links = await songlink.get_links(
+                            track.url or "",
+                            artist=track.artist,
+                            title=track.title,
+                        )
+                        if platform_links:
                                 songlink_url = songlink.format_links(
                                     platform_links, compact=True
                                 )
