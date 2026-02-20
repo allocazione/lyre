@@ -40,8 +40,8 @@ run-verbose: ## Run the bot with debug logging
 build: ## Build the Docker image
 	docker build -t lyre:latest .
 
-up: ## Start Lyre via docker-compose (background)
-	docker-compose up -d
+up: ## Start Lyre via docker-compose (background, rebuilds image)
+	docker-compose up -d --build
 
 down: ## Stop Lyre via docker-compose
 	docker-compose down
