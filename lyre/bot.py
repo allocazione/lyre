@@ -220,13 +220,9 @@ async def _run_bot():
 
                         # Update bio
                         if Config.UPDATE_BIO:
-                            bio_extra = ""
-                            if songlink_url:
-                                bio_extra = f"\n\n{songlink_url}"
-                            elif track.url:
-                                bio_extra = f"\n\n{track.url}"
+                            link = songlink_url or track.url or ""
                             await misskey.update_now_playing(
-                                track_str + bio_extra
+                                track_str, link=link
                             )
 
                         # Post note with platform links (skip if same song)

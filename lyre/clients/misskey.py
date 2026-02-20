@@ -19,7 +19,7 @@ class MisskeyClient:
             timeout=15.0,
             headers={"Content-Type": "application/json"},
         )
-        self._original_bio: Optional[str] = None
+        self._clean_bio: Optional[str] = None
         logger.info(f"Initialized Misskey client for instance: {self.instance_url}")
 
     async def verify_credentials(self) -> dict:
@@ -65,12 +65,12 @@ class MisskeyClient:
         """Mark the bot as online in the bio."""
         profile = await self.get_profile()
         current_bio = profile.get("description", "") or ""
-        self._original_bio = current_bio
 
-        # Remove any existing status line and prepend online status
-        clean_bio = self._clean_bot_header(current_bio)
-        if clean_bio:
-            new_bio = f"[Online] Currently running.\n\n{clean_bio}"
+        # Cache the user's real bio (with all bot headers stripped)
+        self._clean_bio = self._clean_bot_header(current_bio)
+
+        if self._clean_bio:
+            new_bio = f"[Online] Currently running.\n\n{self._clean_bio}"
         else:
             new_bio = "[Online] Currently running."
         await self.update_bio(new_bio)
@@ -78,27 +78,38 @@ class MisskeyClient:
 
     async def set_offline(self) -> None:
         """Mark the bot as offline in the bio."""
-        profile = await self.get_profile()
-        current_bio = profile.get("description", "") or ""
+        if self._clean_bio is None:
+            profile = await self.get_profile()
+            current_bio = profile.get("description", "") or ""
+            self._clean_bio = self._clean_bot_header(current_bio)
 
-        clean_bio = self._clean_bot_header(current_bio)
-        if clean_bio:
-            new_bio = f"[Offline]\n\n{clean_bio}"
+        if self._clean_bio:
+            new_bio = f"[Offline]\n\n{self._clean_bio}"
         else:
             new_bio = "[Offline]"
         await self.update_bio(new_bio)
         logger.info("Status set to Offline.")
 
-    async def update_now_playing(self, track_str: str) -> None:
-        """Update the bio with the currently playing track."""
-        profile = await self.get_profile()
-        current_bio = profile.get("description", "") or ""
+    async def update_now_playing(self, track_str: str, link: str = "") -> None:
+        """Update the bio with the currently playing track.
 
-        clean_bio = self._clean_bot_header(current_bio)
-        if clean_bio:
-            new_bio = f"[Online] Now listening: {track_str}\n\n{clean_bio}"
+        Args:
+            track_str: Display string for the track (e.g. "Artist - Title").
+            link: Optional URL (song.link, Spotify, etc.) shown below the header.
+        """
+        if self._clean_bio is None:
+            profile = await self.get_profile()
+            current_bio = profile.get("description", "") or ""
+            self._clean_bio = self._clean_bot_header(current_bio)
+
+        header = f"[Online] Now listening: {track_str}"
+        if link:
+            header += f"\n{link}"
+
+        if self._clean_bio:
+            new_bio = f"{header}\n\n{self._clean_bio}"
         else:
-            new_bio = f"[Online] Now listening: {track_str}"
+            new_bio = header
         await self.update_bio(new_bio)
 
     async def post_note(self, text: str, visibility: str = "home") -> dict:
@@ -127,47 +138,62 @@ class MisskeyClient:
     @staticmethod
     def _clean_bot_header(bio: str) -> str:
         """Remove all bot status and attached song links from the top of the bio.
-        
+
         Uses a loop to gracefully handle multiple accumulated headers or orphaned
         links left by older versions of the bot.
         """
         if not bio:
             return ""
-            
+
         lines = bio.split("\n")
-        
+
+        # Platform prefixes emitted by SongLinkClient.format_links (full listing)
+        _PLATFORM_PREFIXES = (
+            "Spotify:", "Apple Music:", "YouTube:", "YouTube Music:",
+            "Tidal:", "Amazon Music:", "Deezer:", "SoundCloud:", "song.link:",
+        )
+
+        # All URL domains the bot could possibly insert
+        _BOT_DOMAINS = (
+            "song.link", "album.link", "odesli.co",
+            "last.fm", "spotify.com", "stats.fm",
+            "music.apple.com", "youtube.com", "youtubemusic.com",
+            "tidal.com", "amazon.", "deezer.com", "soundcloud.com",
+        )
+
         while lines:
             first = lines[0].strip()
-            
-            # 1. Remove exact bot markers or combined lines
+
+            # 1. Remove bot status markers ([Online] / [Offline])
             if first.startswith("[Online]") or first.startswith("[Offline]"):
                 lines.pop(0)
                 continue
-                
+
             # 2. Remove orphaned "Now listening" lines
             if first.startswith("Now listening:"):
                 lines.pop(0)
                 continue
-                
-            # 3. Remove orphaned music platform links
-            is_bot_url = False
-            if first.startswith("http://") or first.startswith("https://"):
+
+            # 3. Remove music platform URLs
+            if first.startswith(("http://", "https://")):
                 url = first.lower()
-                if any(domain in url for domain in ["song.link", "last.fm", "spotify.com", "stats.fm"]):
-                    is_bot_url = True
-                    
-            if is_bot_url:
+                if any(domain in url for domain in _BOT_DOMAINS):
+                    lines.pop(0)
+                    continue
+
+            # 4. Remove "Platform: URL" lines from full song.link listings
+            if first.startswith(_PLATFORM_PREFIXES):
                 lines.pop(0)
                 continue
-                
-            # 4. Remove blank lines used as spacing
+
+            # 5. Remove blank lines used as spacing
             if first == "":
                 lines.pop(0)
                 continue
-                
+
             # If we reach here, it's normal user bio text
             break
-                
+
         return "\n".join(lines).strip()
 
     async def close(self):
