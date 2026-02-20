@@ -1,4 +1,4 @@
-# Lyre
+<h1 align="center">🎻 Lyre</h1>
 
 A user-first, self-hostable "now listening" bot for Misskey (and Mastodon-compatible instances). Lyre periodically checks what you are listening to via Last.fm or Stats.fm and updates your Misskey profile bio and posts status notes accordingly. When the bot starts, your bio is marked as online; when it shuts down, it is marked as offline.
 
@@ -45,7 +45,7 @@ A user-first, self-hostable "now listening" bot for Misskey (and Mastodon-compat
 ### Linux
 
 ```bash
-git clone https://github.com/your-username/lyre.git
+git clone https://github.com/allocazione/lyre.git
 cd lyre
 python3 -m venv venv
 source venv/bin/activate
@@ -55,7 +55,7 @@ pip install -r requirements.txt
 ### Windows
 
 ```powershell
-git clone https://github.com/your-username/lyre.git
+git clone https://github.com/allocazione/lyre.git
 cd lyre
 python -m venv venv
 venv\Scripts\activate
@@ -250,3 +250,9 @@ pyproject.toml           Project metadata and dependencies
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  made with ❤️ from italy
+</p>
