@@ -161,8 +161,6 @@ async def _run_bot():
     Config.validate()
     if Config.POLL_INTERVAL < 10:
         logger.warning(f"Poll interval {Config.POLL_INTERVAL}s is too short. Minimum is 10s. Forcing 10s.")
-        # We don't modify the class variable directly to avoid side effects if reloaded,
-        # but we use a local variable for the loop or just update it once.
         Config.POLL_INTERVAL = 10
 
     misskey = MisskeyClient()
@@ -177,9 +175,9 @@ async def _run_bot():
         logger.info(f"Received signal {sig}. Shutting down gracefully...")
         running = False
 
-    # SIGINT works on all platforms (Ctrl+C).
+    # SIGINT
     signal.signal(signal.SIGINT, handle_shutdown)
-    # SIGTERM is only available on Unix-like systems.
+    # SIGTERM
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, handle_shutdown)
 
@@ -389,7 +387,6 @@ def main(
 
     # Load config -- only skip the wizard for utility flags that
     # don't actually need credentials (status/docker/encrypt).
-    # Debug flags DO need valid credentials, so let the wizard run.
     from lyre.config import init_config
     is_utility = docker or status or encrypt_config
     init_config(skip_wizard=is_utility)

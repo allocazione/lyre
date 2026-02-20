@@ -126,7 +126,7 @@ class StatsFmProvider(MusicProvider):
             if external_ids and isinstance(external_ids, dict):
                 spotify_ids = external_ids.get("spotify")
                 if spotify_ids and isinstance(spotify_ids, list) and len(spotify_ids) > 0:
-                    url = spotify_ids[0]
+                    url = f"https://open.spotify.com/track/{spotify_ids[0]}"
 
             return Track(
                 title=track_info.get("name") or "Unknown Track",
