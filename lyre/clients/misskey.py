@@ -139,6 +139,11 @@ class MisskeyClient:
         while lines:
             first = lines[0].strip()
             
+            # 1. Remove exact bot markers or combined lines
+            if first.startswith("[Online]") or first.startswith("[Offline]"):
+                lines.pop(0)
+                continue
+                
             # 2. Remove orphaned "Now listening" lines
             if first.startswith("Now listening:"):
                 lines.pop(0)

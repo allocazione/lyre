@@ -222,7 +222,9 @@ async def _run_bot():
                         if Config.UPDATE_BIO:
                             bio_extra = ""
                             if songlink_url:
-                                bio_extra = f"\n{songlink_url}"
+                                bio_extra = f"\n\n{songlink_url}"
+                            elif track.url:
+                                bio_extra = f"\n\n{track.url}"
                             await misskey.update_now_playing(
                                 track_str + bio_extra
                             )
@@ -233,7 +235,7 @@ async def _run_bot():
                             if songlink_url:
                                 note_text += f"\n\n{songlink_url}"
                             elif track.url:
-                                note_text += f"\n{track.url}"
+                                note_text += f"\n\n{track.url}"
                             await misskey.post_note(note_text)
                             last_posted_track_str = track_str
 
