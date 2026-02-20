@@ -1,0 +1,8 @@
+services:
+  lyre:
+    build: .
+    container_name: lyre-bot
+    restart: unless-stopped
+    volumes:
+      # Mount your local config into the container
+      - ~/.config/lyre:/root/.config/lyre

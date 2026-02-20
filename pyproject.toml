@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "lyre"
+version = "0.1.0"
+description = "A user-first, self-hostable 'now listening' bot for Mastodon/Misskey."
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "lyre"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+Misskey-py = "^4.2.0"
+pylast = "^5.2.0"
+loguru = "^0.7.2"
+python-dotenv = "^1.0.1"
+typer = "^0.9.0"
+httpx = "^0.27.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+lyre = "lyre.bot:main"
