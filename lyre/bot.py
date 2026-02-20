@@ -387,10 +387,11 @@ def main(
     for line in _BANNER.strip().splitlines():
         logger.info(line)
 
-    # Load config -- skip the interactive wizard for utility flags
-    # so they work even without a .env file.
+    # Load config -- only skip the wizard for utility flags that
+    # don't actually need credentials (status/docker/encrypt).
+    # Debug flags DO need valid credentials, so let the wizard run.
     from lyre.config import init_config
-    is_utility = debug_songs or debug_acc or docker or status or encrypt_config
+    is_utility = docker or status or encrypt_config
     init_config(skip_wizard=is_utility)
 
     try:
