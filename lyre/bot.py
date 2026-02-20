@@ -184,16 +184,10 @@ async def _run_bot():
     # Post intro note on first connection
     await _post_intro_if_needed(misskey)
 
-    # Set bio to online
-    try:
-        if Config.UPDATE_BIO:
-            await misskey.set_online()
-        logger.info(
-            f"Bot started. Polling every {Config.POLL_INTERVAL}s "
-            f"using {Config.MUSIC_PROVIDER}."
-        )
-    except Exception as e:
-        logger.error(f"Failed to set online status: {e}")
+    logger.info(
+        f"Bot started. Polling every {Config.POLL_INTERVAL}s "
+        f"using {Config.MUSIC_PROVIDER}."
+    )
 
     try:
         while running:
@@ -223,13 +217,6 @@ async def _run_bot():
                                 )
                                 logger.info(f"  song.link: {songlink_url}")
 
-                        # Update bio
-                        if Config.UPDATE_BIO:
-                            link = songlink_url or track.url or ""
-                            await misskey.update_now_playing(
-                                track_str, link=link
-                            )
-
                         # Post note with platform links (skip if same song)
                         if Config.POST_NOTES and track_str != last_posted_track_str:
                             note_text = f"Now listening: {track_str}"
@@ -247,8 +234,6 @@ async def _run_bot():
                 elif last_track is not None:
                     # Was playing, now stopped
                     logger.info("Playback stopped.")
-                    if Config.UPDATE_BIO:
-                        await misskey.set_online("Nothing playing.")
                     last_track = None
                 else:
                     logger.debug("No track currently playing.")
@@ -263,13 +248,6 @@ async def _run_bot():
                 await asyncio.sleep(1)
 
     finally:
-        # Set bio to offline before exiting
-        try:
-            if Config.UPDATE_BIO:
-                await misskey.set_offline()
-        except Exception as e:
-            logger.error(f"Failed to set offline status: {e}")
-
         await songlink.close()
         if hasattr(provider, "close"):
             await provider.close()
