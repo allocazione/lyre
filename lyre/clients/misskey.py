@@ -29,6 +29,8 @@ class MisskeyClient:
             "/api/i",
             json={"i": self.token},
         )
+        if response.status_code >= 400:
+            logger.error(f"Misskey API error in verify_credentials ({response.status_code}): {response.text}")
         response.raise_for_status()
         data = response.json()
         logger.info(f"Authenticated as: @{data.get('username', 'unknown')}")
@@ -40,6 +42,8 @@ class MisskeyClient:
             "/api/i",
             json={"i": self.token},
         )
+        if response.status_code >= 400:
+            logger.error(f"Misskey API error in get_profile ({response.status_code}): {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -52,6 +56,8 @@ class MisskeyClient:
                 "description": bio,
             },
         )
+        if response.status_code >= 400:
+            logger.error(f"Misskey API error in update_bio ({response.status_code}): {response.text}")
         response.raise_for_status()
         logger.info(f"Bio updated.")
 
@@ -114,6 +120,8 @@ class MisskeyClient:
                 "visibility": visibility,
             },
         )
+        if response.status_code >= 400:
+            logger.error(f"Misskey API error in post_note ({response.status_code}): {response.text}")
         response.raise_for_status()
         data = response.json()
         note_id = data.get("createdNote", {}).get("id", "unknown")

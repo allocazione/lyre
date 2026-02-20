@@ -245,7 +245,9 @@ class Config:
             try:
                 from lyre.crypto import decrypt_value
                 return decrypt_value(value)
-            except Exception:
+            except Exception as e:
+                from lyre.logger import logger
+                logger.error(f"Failed to decrypt config field '{key}': {e}. Check if .lyre.key is valid.")
                 return value
 
         cls.MISSKEY_INSTANCE_URL = os.getenv("MISSKEY_INSTANCE_URL", "")
