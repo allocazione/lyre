@@ -37,19 +37,19 @@ run-verbose: ## Run the bot with debug logging
 
 # ── Docker ───────────────────────────────────────────────────
 
-docker-build: ## Build the Docker image
+build: ## Build the Docker image
 	docker build -t lyre:latest .
 
-docker-up: ## Start Lyre via docker-compose (background)
+up: ## Start Lyre via docker-compose (background)
 	docker-compose up -d
 
-docker-down: ## Stop Lyre via docker-compose
+down: ## Stop Lyre via docker-compose
 	docker-compose down
 
-docker-status: ## Check if a Lyre container is running
+status: ## Check if a Lyre container is running
 	@docker ps --filter "name=lyre-bot" --format "table {{.ID}}\t{{.Status}}\t{{.Names}}" || echo "Docker not available."
 
-docker-logs: ## Tail logs from the running container
+logs: ## Tail logs from the running container
 	docker-compose logs -f
 
 # ── Quality ──────────────────────────────────────────────────

@@ -68,8 +68,7 @@ class MisskeyClient:
         self._original_bio = current_bio
 
         # Remove any existing status line and prepend online status
-        clean_bio = self._strip_status_line(current_bio)
-        clean_bio = self._strip_now_playing_line(clean_bio)
+        clean_bio = self._clean_bot_header(current_bio)
         if clean_bio:
             new_bio = f"[Online] Currently running.\n\n{clean_bio}"
         else:
@@ -82,9 +81,7 @@ class MisskeyClient:
         profile = await self.get_profile()
         current_bio = profile.get("description", "") or ""
 
-        clean_bio = self._strip_status_line(current_bio)
-        # Also strip any "now listening" line
-        clean_bio = self._strip_now_playing_line(clean_bio)
+        clean_bio = self._clean_bot_header(current_bio)
         if clean_bio:
             new_bio = f"[Offline]\n\n{clean_bio}"
         else:
@@ -97,8 +94,7 @@ class MisskeyClient:
         profile = await self.get_profile()
         current_bio = profile.get("description", "") or ""
 
-        clean_bio = self._strip_status_line(current_bio)
-        clean_bio = self._strip_now_playing_line(clean_bio)
+        clean_bio = self._clean_bot_header(current_bio)
         if clean_bio:
             new_bio = f"[Online] Now listening: {track_str}\n\n{clean_bio}"
         else:
@@ -129,28 +125,45 @@ class MisskeyClient:
         return data
 
     @staticmethod
-    def _strip_status_line(bio: str) -> str:
-        """Remove existing [Online]/[Offline] lines from bio."""
+    def _clean_bot_header(bio: str) -> str:
+        """Remove all bot status and attached song links from the top of the bio.
+        
+        Uses a loop to gracefully handle multiple accumulated headers or orphaned
+        links left by older versions of the bot.
+        """
+        if not bio:
+            return ""
+            
         lines = bio.split("\n")
-        # Only remove lines that explicitly start with our status markers
-        filtered = [
-            line
-            for line in lines
-            if not line.strip().startswith("[Online]")
-            and not line.strip().startswith("[Offline]")
-        ]
-        return "\n".join(filtered).strip()
-
-    @staticmethod
-    def _strip_now_playing_line(bio: str) -> str:
-        """Remove 'Now listening:' lines."""
-        lines = bio.split("\n")
-        # Only remove the line if it starts with the specific prefix to avoid
-        # stripping user text that happens to contain "Now listening:"
-        filtered = [
-            line for line in lines if not line.strip().startswith("Now listening:")
-        ]
-        return "\n".join(filtered).strip()
+        
+        while lines:
+            first = lines[0].strip()
+            
+            # 2. Remove orphaned "Now listening" lines
+            if first.startswith("Now listening:"):
+                lines.pop(0)
+                continue
+                
+            # 3. Remove orphaned music platform links
+            is_bot_url = False
+            if first.startswith("http://") or first.startswith("https://"):
+                url = first.lower()
+                if any(domain in url for domain in ["song.link", "last.fm", "spotify.com", "stats.fm"]):
+                    is_bot_url = True
+                    
+            if is_bot_url:
+                lines.pop(0)
+                continue
+                
+            # 4. Remove blank lines used as spacing
+            if first == "":
+                lines.pop(0)
+                continue
+                
+            # If we reach here, it's normal user bio text
+            break
+                
+        return "\n".join(lines).strip()
 
     async def close(self):
         await self.client.aclose()
