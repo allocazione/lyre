@@ -2,7 +2,7 @@
 name = "lyre"
 version = "0.1.0"
 description = "A user-first, self-hostable 'now listening' bot for Mastodon/Misskey."
-authors = ["Your Name <you@example.com>"]
+authors = ["Selene - https://github.com/allocazione"]
 readme = "README.md"
 packages = [{include = "lyre"}]
 
