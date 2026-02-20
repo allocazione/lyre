@@ -60,48 +60,79 @@ class StatsFmProvider(MusicProvider):
             logger.error(f"Error fetching recent streams from Stats.fm: {e}")
             return None
 
-    def _parse_current_stream(self, data: dict) -> Optional[Track]:
+    def _parse_current_stream(self, data) -> Optional[Track]:
         """Parse the /streams/current response."""
         try:
-            # The response structure may vary; handle common shapes
+            if data is None:
+                return None
+            
+            # The API sometimes returns the last played track even when paused,
+            # but marks it with "isPlaying": false.
             if isinstance(data, dict):
-                # Could be nested under "item" or directly contain track info
-                item = data.get("item", data)
+                is_playing = data.get("isPlaying")
+                # If explicitly marked as not playing, return None
+                if is_playing is False:
+                    logger.debug("Stats.fm reports track is paused (isPlaying=False).")
+                    return None
+                    
+                item = data.get("item") or data
                 return self._parse_stream_item(item, is_now_playing=True)
-            elif isinstance(data, list) and len(data) > 0:
-                return self._parse_stream_item(data[0], is_now_playing=True)
+                
+            elif isinstance(data, list) and len(data) > 0 and data[0]:
+                item = data[0]
+                if isinstance(item, dict) and item.get("isPlaying") is False:
+                    logger.debug("Stats.fm reports track is paused (isPlaying=False).")
+                    return None
+                return self._parse_stream_item(item, is_now_playing=True)
+                
             return None
         except Exception as e:
             logger.error(f"Error parsing Stats.fm current stream: {e}")
             return None
 
     def _parse_stream_item(
-        self, item: dict, is_now_playing: bool = False
+        self, item, is_now_playing: bool = False
     ) -> Optional[Track]:
         """Parse a single stream item into a Track object."""
+        if not item or not isinstance(item, dict):
+            return None
+
         try:
-            track_info = item.get("track", item)
-            artists = track_info.get("artists", [])
-            artist_name = (
-                artists[0].get("name", "Unknown Artist")
-                if artists
-                else track_info.get("artistName", "Unknown Artist")
-            )
-            album_info = track_info.get("albums", [{}])
-            album_name = (
-                album_info[0].get("name") if album_info else track_info.get("albumName")
-            )
-            image = (
-                album_info[0].get("image") if album_info else track_info.get("image")
-            )
+            track_info = item.get("track") or item
+            if not isinstance(track_info, dict):
+                return None
+
+            # -- Artist --
+            artists = track_info.get("artists") or []
+            first_artist = artists[0] if artists else None
+            if first_artist and isinstance(first_artist, dict):
+                artist_name = first_artist.get("name") or "Unknown Artist"
+            else:
+                artist_name = track_info.get("artistName") or "Unknown Artist"
+
+            # -- Album --
+            albums = track_info.get("albums") or []
+            first_album = albums[0] if albums else None
+            if first_album and isinstance(first_album, dict):
+                album_name = first_album.get("name")
+                image = first_album.get("image")
+            else:
+                album_name = track_info.get("albumName")
+                image = track_info.get("image")
+
+            # -- URL (Spotify external ID) --
+            external_ids = track_info.get("externalIds")
+            url = None
+            if external_ids and isinstance(external_ids, dict):
+                spotify_ids = external_ids.get("spotify")
+                if spotify_ids and isinstance(spotify_ids, list) and len(spotify_ids) > 0:
+                    url = spotify_ids[0]
 
             return Track(
-                title=track_info.get("name", "Unknown Track"),
+                title=track_info.get("name") or "Unknown Track",
                 artist=artist_name,
                 album=album_name,
-                url=track_info.get("externalIds", {}).get("spotify", [None])[0]
-                if track_info.get("externalIds") and track_info.get("externalIds").get("spotify")
-                else None,
+                url=url,
                 image_url=image,
                 is_now_playing=is_now_playing,
             )
